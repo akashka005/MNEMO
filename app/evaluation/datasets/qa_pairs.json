@@ -1,0 +1,17 @@
+[
+    {
+        "question":
+        "What do transformers use?",
+
+        "answer":
+        "Transformers use self-attention."
+    },
+
+    {
+        "question":
+        "Why is attention useful?",
+
+        "answer":
+        "Attention captures dependencies."
+    }
+]

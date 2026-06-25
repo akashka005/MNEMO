@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+neo4j
+sentence-transformers
+groq
+pydantic-settings
+requests
+beautifulsoup4
+python-dotenv

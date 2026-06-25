@@ -1,0 +1,23 @@
+[
+    {
+        "statement_a":
+        "Transformers use self-attention",
+
+        "statement_b":
+        "Transformers do not use self-attention",
+
+        "contradiction":
+        true
+    },
+
+    {
+        "statement_a":
+        "Attention improves context",
+
+        "statement_b":
+        "Attention improves context",
+
+        "contradiction":
+        false
+    }
+]
