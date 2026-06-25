@@ -5,171 +5,244 @@
 
 ---
 
-## 📖 Abstract & Overview
-Traditional Retrieval-Augmented Generation (RAG) models suffer from a fatal flaw: they act as passive, static memory banks. When a standard RAG system ingests new documents, it blindly appends them to a vector database without evaluating semantic overlap, factual contradictions, or logical extensions of existing knowledge. This results in bloated, noisy context windows and "hallucination by contradiction."
+## Overview
 
-**MNEMO** is a research-grade platform that solves this through **Continuous Knowledge Engineering (CKE)**. By orchestrating Large Language Models (LLMs) with a native Graph Database (Neo4j), MNEMO doesn't just retrieve knowledge—it actively evaluates, structures, and synthesizes incoming information into a living, interconnected cognitive graph.
+MNEMO is a research-focused knowledge engineering platform that transforms passive document ingestion into an active graph reasoning system.
 
-## 🚀 Novelty & Contribution
-MNEMO introduces several novel architectural paradigms that move beyond the limitations of standard semantic search:
+Instead of treating new text as raw vectors only, MNEMO:
 
-1. **The 4-State CKE Matrix**: Instead of simple insertion, every incoming chunk of knowledge is evaluated by an LLM-driven Coherence Agent. The agent computes similarity and applies logical reasoning to categorize the ingestion into one of four states: **MERGE**, **EXTEND**, **CONFLICT**, or **EMERGE**.
-2. **Socratic Graph Synthesis**: Rather than simply answering user questions factually, the Query Engine can operate in "Socratic Mode." By traversing `CONTRADICTS` edges in the graph, the LLM actively highlights tensions in the literature and challenges the user's implicit assumptions.
-3. **Autonomous Research Orchestrator**: A specialized multi-agent system that analyzes sub-graphs to dynamically identify literature trends, missing gaps, structural contradictions, and novel hypotheses.
+- evaluates semantic overlap, extension, and contradiction,
+- maps new content to explicit graph relationships,
+- preserves conflicting knowledge instead of overwriting it,
+- and exposes query and research analysis workflows on top of a Neo4j knowledge graph.
 
 ---
 
-## 🏗️ High-Level Architecture
+## Core Concepts
 
-The system operates across three primary stages: **Ingestion**, **Storage**, and **Retrieval/Orchestration**.
+### Continuous Knowledge Engineering (CKE)
+
+The ingestion pipeline uses a four-state coherence model:
+
+- **MERGE**: incoming content matches an existing node and reinforces it.
+- **EXTEND**: incoming content expands an existing concept with a new child or detail.
+- **CONFLICT**: incoming content contradicts existing knowledge and is linked as a counterpoint.
+- **EMERGE**: incoming content is semantically distant and becomes a new concept.
+
+These decisions are made by combining embedding similarity with LLM classification.
+
+### Graph Relationships
+
+MNEMO stores knowledge in Neo4j using typed relationships:
+
+- `SUPPORTS` for positive reinforcement
+- `EXTENDS` for elaboration and detail
+- `CONTRADICTS` for opposing claims
+- `EMERGES_FROM` for distant or bridging concepts
+
+---
+
+## Architecture
 
 ```mermaid
 graph TD
-    %% High Level Nodes
-    User([User / URL / Text])
-    UI[React Frontend Dashboard]
-    
-    subgraph "FastAPI Backend Layer"
-        Ingest[Ingestion Engine]
-        CKE[CKE Coherence Agent]
-        Query[Dual-Mode Query Engine]
-        Research[Research Orchestrator]
-    end
-    
-    subgraph "Knowledge Graph Layer (Neo4j)"
-        Nodes((Concepts / Chunks))
-        Edges{MERGE / EXTENDS / CONTRADICTS}
-    end
-    
-    %% Connections
-    User -->|Raw Data| UI
-    UI -->|Data Stream| Ingest
-    Ingest -->|Chunked & Embedded| CKE
-    CKE -->|4-State Graph Operations| Edges
-    Edges --> Nodes
-    
-    UI <-->|Queries| Query
-    Query <-->|Traverse Graph| Nodes
-    
-    UI <-->|Analyze Sub-graph| Research
-    Research <-->|Aggregated Context| Nodes
+    A[User / Client] --> B[Frontend (React + Vite)]
+    B --> C[FastAPI Backend]
+    C --> D[Ingestion Pipeline]
+    C --> E[Query Agent]
+    C --> F[Research Orchestrator]
+    D --> G[Neo4j Knowledge Graph]
+    E --> G
+    F --> G
 ```
 
 ---
 
-## ⚙️ Low-Level Component Design
+## Key Components
 
-At the implementation level, MNEMO relies on dense vector retrieval combined with LLM-based logical gating.
-
-```mermaid
-sequenceDiagram
-    participant Source as Text/URL
-    participant IA as IngestionAgent
-    participant Embed as SentenceTransformers
-    participant Neo4j as GraphDB
-    participant CA as CoherenceAgent (Groq LLM)
-    
-    Source->>IA: Raw Input
-    IA->>IA: Text Chunking (LangChain)
-    IA->>Embed: BAAI/bge-small-en-v1.5
-    Embed-->>IA: Dense Vectors (384d)
-    
-    loop For each chunk
-        IA->>Neo4j: Vector Similarity Search (Top-K)
-        Neo4j-->>IA: Nearest Context Nodes
-        
-        IA->>CA: Prompt: [New Chunk] + [Context Nodes]
-        CA->>CA: LLM Logical Evaluation
-        
-        alt Semantic Overlap > 0.88
-            CA-->>Neo4j: Operation: MERGE (Update Confidence)
-        else Logical Extension
-            CA-->>Neo4j: Operation: EXTEND (Create Node + EXTENDS Edge)
-        else Direct Contradiction
-            CA-->>Neo4j: Operation: CONFLICT (Create Node + CONTRADICTS Edge)
-        else No Semantic Overlap
-            CA-->>Neo4j: Operation: EMERGE (Create Isolated Node)
-        end
-    end
-```
+- `app/main.py` — FastAPI app and endpoint registration
+- `app/api/routes/` — REST routes for ingestion, query, graph retrieval, insights, and research analysis
+- `app/ingestion/` — source ingestion, text chunking, and document parsing
+- `app/agents/` — orchestration of ingestion, coherence, dialogue, query, insight, and evolution logic
+- `app/graph/` — Neo4j client, node/edge operations, and query utilities
+- `app/llm/` — Groq client and prompt templates
+- `app/research_agents/` — multi-agent research analysis pipeline
+- `frontend/` — React-based dashboard and graph visualization
 
 ---
 
-## 🧠 Core CKE Semantics
+## What This Project Does
 
-The core of MNEMO's intelligence lies in the deterministic mapping of LLM reasoning to Graph Operations.
-
-1. **MERGE (`a = b`)**: The incoming knowledge is semantically identical to a node already in the database. Instead of duplicating data, the system reinforces the original node by incrementing its `confidence` score.
-2. **EXTEND (`a ⊃ b`)**: The incoming knowledge adds detail, nuance, or sub-topics to an existing concept. A new node is created and linked via an `[EXTENDS]` relationship, building a hierarchical taxonomy.
-3. **CONFLICT (`a ≠ b`)**: The incoming knowledge directly contradicts a fact or theory in the database. A new node is created and linked via a `[CONTRADICTS]` relationship. This is critical for scientific discovery and maintaining a balanced knowledge base without destructive overwrites.
-4. **EMERGE (`a ∩ b = ∅`)**: The incoming knowledge is statistically distant and logically unrelated to existing concepts. It is instantiated as a new root node, serving as an anchor for future knowledge.
-
----
-
-## 🔬 Multi-Agent Research Orchestrator
-
-MNEMO ships with a multi-agent orchestration pipeline designed for deep literature review and hypothesis generation. Given a sub-graph of nodes, the orchestrator triggers four concurrent LLM sub-agents:
-
-- **Literature Agent**: Identifies statistical trends, recurring concepts, and unaddressed gaps in the text.
-- **Hypothesis Agent**: Synthesizes distant nodes to propose novel, testable hypotheses.
-- **Contradiction Agent**: Highlights structural tensions and logical fallacies between disparate nodes.
-- **Novelty Agent**: Flags highly anomalous or paradigm-shifting information against the established graph baseline.
+1. Ingests raw text into `app.ingestion.ingestion_pipeline.IngestionPipeline`
+2. Chunks the document and embeds each piece
+3. Stores content as graph nodes with embeddings in Neo4j
+4. Uses `app.agents.coherence_agent.CoherenceAgent` to compare new chunks against existing nodes
+5. Applies graph operations according to semantic similarity and LLM reasoning
+6. Answers queries through `app.agents.dialogue_agent.DialogueAgent`
+7. Provides research insights using `app.research_agents.research_orchestrator.ResearchOrchestrator`
 
 ---
 
-## 🛠️ Technology Stack
+## API Endpoints
 
-| Domain | Technology | Rationale |
-| :--- | :--- | :--- |
-| **LLM Engine** | `Groq API` (Llama 3.1 8B) | Ultra-low latency inference required for real-time CKE evaluation pipeline. |
-| **Embeddings** | `SentenceTransformers` | Local execution of `BAAI/bge-small-en-v1.5` for fast 384-dimensional dense vectors. |
-| **Database** | `Neo4j` | Native property graph for storing both high-dimensional vectors and explicit semantic edges. |
-| **Backend** | `FastAPI` (Python) | High-throughput asynchronous orchestration and routing. |
-| **Frontend** | `React` + `Vite` | Dynamic, responsive glassmorphic UI with real-time CKE operation feeds. |
+### Ingestion
+
+- `POST /ingest`
+  - Request: `{ "text": "...", "source": "manual" }`
+  - Response: status, message, created node metadata, and CKE operation details
+
+### Query
+
+- `POST /query`
+  - Request: `{ "question": "...", "mode": "factual" }`
+  - Supported modes: `factual`, `socratic`
+  - Response: answer text plus source node IDs and contradiction metadata
+
+### Graph
+
+- `GET /graph` — returns nodes and edges from Neo4j for visualization
+
+### Insights
+
+- `GET /insights/` — returns contradictions, bridges, low-confidence nodes, and graph summary
+
+### Research Analysis
+
+- `POST /research/analyze`
+  - Accepts `texts`, `nodes`, and `graph`
+  - Returns literature, hypotheses, contradictions, and novelty analysis
 
 ---
 
-## 📦 Local Installation & Setup
+## Configuration
+
+Configuration is loaded from `.env` using `app.config.settings.Settings`.
+
+Default values in the code:
+
+- `GROQ_API_KEY` — required
+- `GROQ_MODEL=llama-3.1-8b-instant`
+- `NEO4J_URI=bolt://localhost:7687`
+- `NEO4J_USER=neo4j`
+- `NEO4J_PASSWORD=password`
+- `EMBED_MODEL=BAAI/bge-small-en-v1.5`
+- `MERGE_THRESHOLD=0.88`
+- `EXTEND_THRESHOLD=0.70`
+- `CONFLICT_THRESHOLD=0.72`
+- `EMERGE_THRESHOLD=0.50`
+- `DECAY_DAYS=30`
+- `EMBED_DIMENSION=384`
+
+---
+
+## Getting Started
 
 ### Prerequisites
-- Python 3.10+
-- Node.js (v18+)
-- Docker (For the Neo4j instance)
-- A Groq API Key
 
-### 1. Database Initialization
-Spin up the Neo4j container:
+- Python 3.10+
+- Node.js 18+
+- Docker
+- Groq API key
+
+### 1. Start Neo4j
+
 ```bash
 docker-compose up -d
 ```
 
-### 2. Backend Orchestration Server
-Install the required Python packages:
+This launches Neo4j on `localhost:7474` and `localhost:7687`.
+
+### 2. Install Backend Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
-Create a `.env` file in the root directory:
+
+### 3. Configure Environment
+
+Create a `.env` file in the repository root:
+
 ```env
-GROQ_API_KEY=your_groq_api_key_here
+GROQ_API_KEY=your_groq_api_key
 GROQ_MODEL=llama-3.1-8b-instant
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=password
 ```
-Boot the FastAPI server:
+
+### 4. Start the API Server
+
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
-### 3. Frontend Client
-Navigate to the frontend directory:
+### 5. Launch the Frontend
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-The application will be accessible at `http://localhost:5174` (or `5173`).
+Open the frontend in your browser at the port shown by Vite.
 
 ---
-*Developed as a research initiative bridging the gap between passive Vector Search and active Semantic Knowledge Engineering.*
+
+## Example Usage
+
+### Ingest Text
+
+```bash
+curl -X POST http://localhost:8000/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"text": "A new paper on graph-based knowledge engineering.", "source": "manual"}'
+```
+
+### Query the Graph
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What are the main contradictions in the knowledge graph?", "mode": "socratic"}'
+```
+
+---
+
+## Notes
+
+- The ingestion route currently processes chunks synchronously in `app.ingestion.ingestion_pipeline.IngestionPipeline`.
+- `app.agents.coherence_agent.CoherenceAgent` uses both semantic similarity and Groq LLM classification to select graph operations.
+- `app.agents.dialogue_agent.DialogueAgent` includes a `socratic` query mode that enriches prompts with active contradictions.
+
+---
+
+## Frontend
+
+The frontend is a Vite/React app located in `frontend/`.
+
+Key packages include:
+
+- `react`
+- `react-dom`
+- `react-router-dom`
+- `react-force-graph-2d`
+- `framer-motion`
+
+---
+
+## Why MNEMO?
+
+MNEMO turns knowledge ingestion into an active engineering process, not a passive database write. It preserves nuance, captures contradictions, and builds an explainable semantic graph for intelligent queries and research analysis.
+
+---
+
+## Project Structure
+
+- `app/main.py` — primary FastAPI app
+- `app/api/routes/` — API endpoint definitions
+- `app/ingestion/` — ingestion, parsing, chunking
+- `app/agents/` — agent workflows and coherence logic
+- `app/graph/` — graph persistence and queries
+- `app/llm/` — Groq integration and prompt templates
+- `app/research_agents/` — research aggregation and novel insight generation
+- `frontend/` — browser UI and graph dashboard
